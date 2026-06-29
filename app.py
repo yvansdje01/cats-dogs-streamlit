@@ -15,7 +15,7 @@ IMG_SIZE = (150, 150)
 # ---------------- LOAD MODEL (SAFE CACHE) ----------------
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("cats_vs_dogs_cnn.h5")
+    return tf.keras.models.load_model("cats_vs_dogs_cnn.keras")
 
 model = load_model()
 
