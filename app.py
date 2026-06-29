@@ -3,101 +3,65 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 
-# =========================
-# CONFIGURATION
-# =========================
+# ---------------- CONFIG ----------------
 st.set_page_config(
-    page_title="Cats vs Dogs AI",
+    page_title="Cats vs Dogs CNN",
     page_icon="🐱🐶",
     layout="centered"
 )
 
-# =========================
-# CHARGEMENT DU MODELE
-# =========================
+IMG_SIZE = (150, 150)
+
+# ---------------- LOAD MODEL (SAFE CACHE) ----------------
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model("cats_vs_dogs_cnn.h5")
 
 model = load_model()
 
-# IMPORTANT : doit être IDENTIQUE à ton entraînement
-IMG_SIZE = (150, 150)
+# ---------------- TITLE ----------------
+st.title("🐱🐶 Cats vs Dogs Classifier")
+st.write("Upload une image et le modèle va prédire Chat ou Chien.")
 
-# =========================
-# TITRE
-# =========================
-st.title("🐱🐶 Classification Cats vs Dogs")
-st.write("Upload une image et le modèle va prédire s'il s'agit d'un chat ou d'un chien.")
-
-# =========================
-# UPLOAD IMAGE
-# =========================
+# ---------------- UPLOAD IMAGE ----------------
 uploaded_file = st.file_uploader(
     "Choisis une image",
     type=["jpg", "jpeg", "png"]
 )
 
-# =========================
-# PRÉTRAITEMENT
-# =========================
-def preprocess_image(image: Image.Image):
+# ---------------- PREPROCESS ----------------
+def preprocess(image):
     image = image.resize(IMG_SIZE)
-    img_array = np.array(image)
+    image = np.array(image) / 255.0
+    image = np.expand_dims(image, axis=0)
+    return image
 
-    # sécurité si image RGBA ou grayscale
-    if img_array.shape[-1] == 4:
-        img_array = img_array[:, :, :3]
-    if len(img_array.shape) == 2:
-        img_array = np.stack((img_array,)*3, axis=-1)
-
-    img_array = img_array / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-
-    return img_array
-
-# =========================
-# PREDICTION
-# =========================
-def predict(img_array):
-    prediction = model.predict(img_array, verbose=0)[0][0]
-
-    if prediction > 0.5:
-        return "🐶 Chien", prediction
-    else:
-        return "🐱 Chat", prediction
-
-# =========================
-# APP LOGIC
-# =========================
+# ---------------- PREDICTION ----------------
 if uploaded_file is not None:
+    try:
+        image = Image.open(uploaded_file).convert("RGB")
 
-    image = Image.open(uploaded_file)
+        st.image(image, caption="Image uploadée", use_container_width=True)
 
-    col1, col2 = st.columns(2)
+        img_array = preprocess(image)
 
-    with col1:
-        st.image(image, caption="Image uploadée", use_column_width=True)
+        prediction = model.predict(img_array)[0][0]
 
-    with col2:
-        st.write("🔄 Analyse en cours...")
+        # Interprétation
+        if prediction > 0.5:
+            label = "🐶 Chien"
+            confidence = prediction
+        else:
+            label = "🐱 Chat"
+            confidence = 1 - prediction
 
-        img_array = preprocess_image(image)
-        label, score = predict(img_array)
+        st.subheader("Résultat")
+        st.write(f"**Classe :** {label}")
+        st.write(f"**Confiance :** {confidence:.2f}")
 
-        confidence = float(score if score > 0.5 else 1 - score)
+        # Barre de confiance
+        st.progress(float(confidence))
 
-        st.subheader("Résultat :")
-        st.success(label)
-
-        st.write(f"Confiance : **{confidence*100:.2f}%**")
-
-        st.progress(confidence)
-
-        st.bar_chart({
-            "Chat": [1 - score],
-            "Chien": [score]
-        })
-
-else:
-    st.info("👆 Upload une image pour commencer la prédiction")
+    except Exception as e:
+        st.error("❌ Erreur lors du traitement de l'image")
+        st.write(e)
